@@ -5,6 +5,15 @@ pub fn zsh_init() -> &'static str {
 
 if command -v feo >/dev/null 2>&1; then
   autoload -Uz add-zsh-hook
+  zmodload zsh/datetime 2>/dev/null || true
+
+  _feo_hook_last() {
+    local hook_name="$1"
+    local function_name="$2"
+
+    add-zsh-hook -d "${hook_name}" "${function_name}" 2>/dev/null || true
+    add-zsh-hook "${hook_name}" "${function_name}"
+  }
 
   _feo_preexec() {
     typeset -g FEO_CMD_START="${EPOCHREALTIME:-0}"
@@ -14,18 +23,21 @@ if command -v feo >/dev/null 2>&1; then
     local feo_status=$?
     local feo_duration_ms=0
 
-    if [[ -n "${FEO_CMD_START:-}" && -n "${EPOCHREALTIME:-}" ]]; then
+    if [[ -n "${FEO_CMD_START:-}" && "${FEO_CMD_START:-0}" != "0" && -n "${EPOCHREALTIME:-}" ]]; then
       feo_duration_ms=$(printf "%.0f" $(( (${EPOCHREALTIME} - ${FEO_CMD_START}) * 1000 )))
     fi
 
     unset FEO_CMD_START
     PROMPT="$(feo prompt --status "${feo_status}" --duration-ms "${feo_duration_ms}")"
+
+    if [[ "${precmd_functions[-1]-}" != "_feo_precmd" ]]; then
+      _feo_hook_last precmd _feo_precmd
+    fi
   }
 
-  add-zsh-hook -d preexec _feo_preexec 2>/dev/null || true
-  add-zsh-hook -d precmd _feo_precmd 2>/dev/null || true
-  add-zsh-hook preexec _feo_preexec
-  add-zsh-hook precmd _feo_precmd
+  _feo_hook_last preexec _feo_preexec
+  _feo_hook_last precmd _feo_precmd
+  _feo_precmd
 
   eval "$(feo plugin source zsh 2>/dev/null)"
 fi
@@ -41,8 +53,10 @@ mod tests {
         let init = zsh_init();
 
         assert!(init.contains("local feo_status=$?"));
-        assert!(init.contains("add-zsh-hook precmd _feo_precmd"));
-        assert!(init.contains("add-zsh-hook preexec _feo_preexec"));
+        assert!(init.contains("zmodload zsh/datetime"));
+        assert!(init.contains("_feo_hook_last preexec _feo_preexec"));
+        assert!(init.contains("_feo_hook_last precmd _feo_precmd"));
+        assert!(init.contains("_feo_precmd"));
         assert!(init.contains("feo plugin source zsh"));
     }
 }

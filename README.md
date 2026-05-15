@@ -25,13 +25,15 @@ Put `target/release/feo` on your `PATH`, then add this to `~/.zshrc`:
 eval "$(feo init zsh)"
 ```
 
+Place this line after other prompt or theme setup such as oh-my-zsh, Starship, or Powerlevel10k. FeO owns `PROMPT`, so anything loaded later that also writes `PROMPT` can replace it on the next command.
+
 Open a new zsh session or run:
 
 ```zsh
 source ~/.zshrc
 ```
 
-The generated zsh integration captures the previous command status before running other hooks, tracks command duration with `preexec`/`precmd`, assigns `PROMPT` from `feo prompt`, and loads only enabled built-in plugin snippets.
+The generated zsh integration captures the previous command status before rendering, tracks command duration with `preexec`/`precmd`, appends FeO hooks idempotently, repairs its `precmd` hook ordering when possible, and loads only enabled built-in plugin snippets.
 
 ## Commands
 
@@ -145,3 +147,15 @@ cargo fmt --all
 cargo check
 cargo test
 ```
+
+## Troubleshooting prompt reverts
+
+If FeO appears for one command and then returns to another prompt, another zsh framework is probably rewriting `PROMPT` after FeO. Move `eval "$(feo init zsh)"` to the end of `.zshrc`, after any `source $ZSH/oh-my-zsh.sh`, `eval "$(starship init zsh)"`, Powerlevel10k setup, or custom `precmd` prompt code.
+
+To inspect hook ordering in the current shell:
+
+```zsh
+print -l $precmd_functions
+```
+
+`_feo_precmd` should appear after other prompt-writing hooks when FeO is intended to own the prompt.
